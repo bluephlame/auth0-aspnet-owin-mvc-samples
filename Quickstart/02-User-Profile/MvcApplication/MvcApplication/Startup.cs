@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Configuration;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Owin;
+using Microsoft.Owin.Host.SystemWeb;
 using Microsoft.Owin.Security;
 using Microsoft.Owin.Security.Cookies;
 using Microsoft.Owin.Security.OpenIdConnect;
+using MvcApplication.Support;
 using Owin;
 
 [assembly: OwinStartup(typeof(MvcApplication.Startup))]
@@ -21,19 +22,19 @@ namespace MvcApplication
             // Configure Auth0 parameters
             string auth0Domain = ConfigurationManager.AppSettings["auth0:Domain"];
             string auth0ClientId = ConfigurationManager.AppSettings["auth0:ClientId"];
-            string auth0ClientSecret = ConfigurationManager.AppSettings["auth0:ClientSecret"];
             string auth0RedirectUri = ConfigurationManager.AppSettings["auth0:RedirectUri"];
             string auth0PostLogoutRedirectUri = ConfigurationManager.AppSettings["auth0:PostLogoutRedirectUri"];
-
-            // Enable Kentor Cookie Saver middleware
-            app.UseKentorOwinCookieSaver();
 
             // Set Cookies as default authentication type
             app.SetDefaultSignInAsAuthenticationType(CookieAuthenticationDefaults.AuthenticationType);
             app.UseCookieAuthentication(new CookieAuthenticationOptions
             {
                 AuthenticationType = CookieAuthenticationDefaults.AuthenticationType,
-                LoginPath = new PathString("/Account/Login")
+                LoginPath = new PathString("/Account/Login"),
+                CookieSameSite = SameSiteMode.Lax,
+                // More information on why the CookieManager needs to be set can be found here: 
+                // https://github.com/aspnet/AspNetKatana/wiki/System.Web-response-cookie-integration-issues
+                CookieManager = new SameSiteCookieManager(new SystemWebCookieManager())
             });
 
             // Configure Auth0 authentication
@@ -44,18 +45,20 @@ namespace MvcApplication
                 Authority = $"https://{auth0Domain}",
 
                 ClientId = auth0ClientId,
-                ClientSecret = auth0ClientSecret,
 
                 RedirectUri = auth0RedirectUri,
                 PostLogoutRedirectUri = auth0PostLogoutRedirectUri,
 
-                ResponseType = OpenIdConnectResponseType.CodeIdToken,
                 Scope = "openid profile email",
 
                 TokenValidationParameters = new TokenValidationParameters
                 {
                     NameClaimType = "name"
                 },
+
+                // More information on why the CookieManager needs to be set can be found here: 
+                // https://docs.microsoft.com/en-us/aspnet/samesite/owin-samesite
+                CookieManager = new SameSiteCookieManager(new SystemWebCookieManager()),
 
                 Notifications = new OpenIdConnectAuthenticationNotifications
                 {
